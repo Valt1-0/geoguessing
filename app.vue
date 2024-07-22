@@ -1,6 +1,15 @@
 <template>
   <div class="flex flex-col items-center p-4">
     <h1 class="text-3xl font-bold mb-4">Guess the Country</h1>
+    <div class="flex mb-4">
+      <img
+        v-for="n in lives"
+        :key="n"
+        src="/assets/lives.png"
+        class="w-8 h-8 mx-1 border-white border-2 rounded-full"
+        alt="Life"
+      />
+    </div>
     <p class="mb-4">{{ description }}</p>
     <UInput
       v-model="userInput"
@@ -47,8 +56,16 @@ const correctCountry = ref("");
 const guessedCountry = ref("");
 const userInput = ref("");
 const incorrectCountries = ref([]);
+const lives = ref(3); // Initialize with 3 lives
 
-// Fonction pour obtenir un pays aléatoire
+// Load the sound files
+let loseLifeSound, winGameSound;
+if (typeof Audio !== "undefined") {
+  loseLifeSound = new Audio("/assets/lose-life.mp3");
+  winGameSound = new Audio("/assets/win-game.mp3");
+}
+
+// Function to get a random country
 const getRandomCountry = async () => {
   try {
     const response = await fetch("/countries.json");
@@ -60,60 +77,105 @@ const getRandomCountry = async () => {
   }
 };
 
-// Réinitialiser le jeu
+// Reset the game
 const resetGame = async () => {
   const randomCountry = await getRandomCountry();
   if (randomCountry) {
     correctCountry.value = randomCountry.country;
     description.value = randomCountry.description;
-    guessedCountry.value = ""; // Réinitialiser guessedCountry pour ne pas afficher le pays en vert
+    guessedCountry.value = ""; // Reset guessedCountry to not show the country in green
     incorrectCountries.value = [];
     userInput.value = "";
+    lives.value = 3; // Reset lives to 3
   }
 };
 
-// Vérifier la réponse de l'utilisateur
+// Check the user's answer
 const checkAnswer = () => {
-  const userCountry = userInput.value.trim();
-  if (userCountry.toLowerCase() === correctCountry.value.toLowerCase()) {
-    guessedCountry.value = correctCountry.value; // Définir guessedCountry au pays correct
+  const userCountry = userInput.value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const correctNormalized = correctCountry.value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (userCountry === correctNormalized) {
+    guessedCountry.value = correctCountry.value; // Set guessedCountry to the correct country
+    if (winGameSound) winGameSound.play(); // Play win game sound
     toast.add({
-      title: "Félicitations !",
-      description: "Vous avez deviné le pays.",
+      title: "Congratulations!",
+      description: "You guessed the country.",
       type: "success",
     });
+    setTimeout(resetGame, 4000); // Reset game after 3 seconds
   } else {
     if (userCountry && !incorrectCountries.value.includes(userCountry)) {
-      incorrectCountries.value.push(userCountry);
-      updateMapStyles(); // Appeler la mise à jour des styles immédiatement
+      incorrectCountries.value.push(userInput.value);
+      lives.value--; // Decrease lives by 1
+      if (loseLifeSound) loseLifeSound.play(); // Play lose life sound
+      updateMapStyles(); // Update the map styles
     }
     userInput.value = "";
+
+    if (lives.value === 0) {
+      toast.add({
+        title: "Game Over",
+        description: "You have no lives left.",
+        type: "error",
+      });
+      resetGame(); // Reset game when lives are over
+    }
   }
 };
 
-// Mettre à jour les styles de la carte
-const updateMapStyles = () => {
-  incorrectCountries.value = [...incorrectCountries.value]; // Triggère la réactivité en copiant le tableau
-};
-
-// Mettre en surbrillance le pays cliqué sur la carte
+// Highlight the clicked country on the map
 const highlightCountry = (countryName) => {
-  if (countryName.toLowerCase() === correctCountry.value.toLowerCase()) {
+  const countryNormalized = countryName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const correctNormalized = correctCountry.value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (countryNormalized === correctNormalized) {
+    if (winGameSound) winGameSound.play(); // Play win game sound
     toast.add({
-      title: "Félicitations !",
-      description: "Vous avez cliqué sur le bon pays.",
+      title: "Congratulations!",
+      description: "You clicked on the correct country.",
       type: "success",
     });
-    guessedCountry.value = correctCountry.value; // Définir guessedCountry au pays correct
+    guessedCountry.value = correctCountry.value; // Set guessedCountry to the correct country
+    setTimeout(resetGame, 4000); // Reset game after 3 seconds
   } else {
     if (!incorrectCountries.value.includes(countryName)) {
       incorrectCountries.value.push(countryName);
-      updateMapStyles(); // Appeler la mise à jour des styles immédiatement
+      lives.value--; // Decrease lives by 1
+      if (loseLifeSound) loseLifeSound.play(); // Play lose life sound
+      updateMapStyles(); // Update the map styles
+    }
+
+    if (lives.value === 0) {
+      toast.add({
+        title: "Game Over",
+        description: "You have no lives left.",
+        type: "error",
+      });
+      resetGame(); // Reset game when lives are over
     }
   }
 };
 
-// Initialisation du jeu uniquement lors du montage
+// Update map styles
+const updateMapStyles = () => {
+  incorrectCountries.value = [...incorrectCountries.value]; // Trigger reactivity by copying the array
+};
+
+// Initialize the game only when mounted
 onMounted(() => {
   resetGame();
 });
