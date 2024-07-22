@@ -1,6 +1,6 @@
-# Nuxt 3 Minimal Starter
+# GeoGuessing
 
-Look at the [Nuxt 3 documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+GeoGuessing Game made with Nuxt 3 / Nuxt UI and Tailwind CSS
 
 
 ![Demo](./image.png)
